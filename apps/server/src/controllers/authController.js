@@ -21,6 +21,25 @@ const hashPassword = async (password) => {
   return `${salt}:${derivedKey.toString('hex')}`;
 };
 
+const seedDefaultUser = async () => {
+  const email = 'a';
+  const password = 'a';
+
+  if (usersByEmail.has(email)) {
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  usersByEmail.set(email, {
+    id: crypto.randomUUID(),
+    email,
+    name: 'a',
+    passwordHash
+  });
+};
+
+const defaultUserReady = seedDefaultUser();
+
 const verifyPassword = async (password, storedHash) => {
   const [salt, savedKeyHex] = storedHash.split(':');
   if (!salt || !savedKeyHex) {
@@ -39,6 +58,8 @@ const verifyPassword = async (password, storedHash) => {
 
 export const register = async (req, res) => {
   try {
+    await defaultUserReady;
+
     const { email, password, name } = req.body;
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
@@ -88,6 +109,8 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
+    await defaultUserReady;
+
     const { email, password } = req.body;
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
