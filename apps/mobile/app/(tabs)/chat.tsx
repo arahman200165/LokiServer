@@ -11,6 +11,7 @@ const chats = [
     name: "Team Loki",
     lastMessage: "New build is ready for testing.",
   },
+  { id: "4", name: "Sarah", lastMessage: "Can you send the design draft?" },
 ];
 
 export default function ChatScreen() {

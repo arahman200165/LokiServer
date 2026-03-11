@@ -8,5 +8,12 @@
 - `packages/shared` - shared types, constants, utils
 
 ## Run backend
+Cd Loki\apps\server
 npm install
-npm run server:dev
+cp .env.example .env
+npm run dev
+
+## Run mobile app
+Cd Loki\apps\mobile
+npm install
+npx expo start
