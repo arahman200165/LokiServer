@@ -10,6 +10,13 @@ import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requireApiKey } from './middleware/requireApiKey.js';
 import { requireSessionAuth } from './middleware/requireSessionAuth.js';
+import { requireBrowserSession } from './middleware/requireBrowserSession.js';
+import {
+  renderLoginPage,
+  handleLoginPage,
+  renderProtectedHomePage,
+  handleLogoutPage
+} from './controllers/webAuthController.js';
 
 const app = express();
 
@@ -19,16 +26,10 @@ app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Backend scaffold is running.',
-    docs: {
-      health: `${env.apiPrefix}/health`,
-      authRegister: `${env.apiPrefix}/auth/register`,
-      authLogin: `${env.apiPrefix}/auth/login`
-    }
-  });
-});
+app.get('/login', renderLoginPage);
+app.post('/login', handleLoginPage);
+app.get('/', requireBrowserSession, renderProtectedHomePage);
+app.post('/logout', requireBrowserSession, handleLogoutPage);
 
 app.use(`${env.apiPrefix}/auth`, requireApiKey, authRoutes);
 app.use('/api', requireApiKey, requireSessionAuth);
@@ -38,3 +39,4 @@ app.use(notFound);
 app.use(errorHandler);
 
 export default app;
+

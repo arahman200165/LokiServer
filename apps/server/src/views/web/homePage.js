@@ -1,0 +1,54 @@
+import { renderPageLayout } from './components/layout.js';
+import { renderApiTable } from './components/apiTable.js';
+import { escapeHtml } from './utils.js';
+
+const homePageStyles = `
+  .chip {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--chip);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 640px;
+  }
+  thead { background: #f1f5f9; }
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    font-size: 14px;
+  }
+  tr:last-child td { border-bottom: none; }
+  form { margin-top: 20px; }
+`;
+
+export const renderHomePageHtml = ({ username, apiPrefix }) =>
+  renderPageLayout({
+    title: 'Loki Backend',
+    extraStyles: homePageStyles,
+    body: `
+      <main>
+        <h1>Loki Backend</h1>
+        <p>Authenticated as <strong>${escapeHtml(username)}</strong>.</p>
+        <span class="chip">API Prefix: <code>${escapeHtml(apiPrefix)}</code></span>
+        ${renderApiTable({ apiPrefix })}
+        <form method="post" action="/logout">
+          <button type="submit">Logout</button>
+        </form>
+      </main>
+    `
+  });
