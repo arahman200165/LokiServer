@@ -1,4 +1,4 @@
-# Loki
+# Loki Areta Sucks and Vishal is MINEEEE
 
 Loki is a monorepo with:
 - A Node.js + Express backend API (`apps/server`)
