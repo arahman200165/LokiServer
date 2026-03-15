@@ -144,6 +144,9 @@ API_KEY=dev-mobile-api-key
 API_KEY_HEADER=x-api-key
 AUTH_USERNAME=loki-admin
 AUTH_PASSWORD=loki-pass-123
+DATABASE_URL=
+DATABASE_SSL=true
+DATABASE_POOL_MAX=10
 ```
 
 ### Mobile
@@ -176,3 +179,6 @@ npm run lint
   - Ensure `EXPO_PUBLIC_API_KEY` exactly matches backend `API_KEY`.
 - Cannot connect from device/emulator:
   - Confirm `API_BASE_URL` in `apps/mobile/app/login.tsx` points to a reachable backend host.
+- DB health check returns `degraded`:
+  - Ensure `DATABASE_URL` is set to a Neon Postgres connection string with `sslmode=require`.
+  - See Neon setup guide: `apps/server/NEON_SETUP.md`.

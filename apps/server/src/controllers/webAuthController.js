@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { createSession, deleteSession } from '../services/sessionStore.js';
+import { runHealthCheck } from '../services/healthCheckService.js';
 import { SESSION_COOKIE_NAME, getBrowserSessionFromRequest } from '../middleware/requireBrowserSession.js';
 import { renderLoginPageHtml } from '../views/web/loginPage.js';
 import { renderHomePageHtml } from '../views/web/homePage.js';
@@ -67,4 +68,9 @@ export const handleLogoutPage = (req, res) => {
 
   res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
   return res.redirect('/login');
+};
+
+export const handleWebHealthCheck = async (req, res) => {
+  const result = await runHealthCheck();
+  return res.status(result.statusCode).json(result.payload);
 };
