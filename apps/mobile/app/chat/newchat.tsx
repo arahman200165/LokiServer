@@ -64,7 +64,14 @@ export default function NewChatScreen() {
       return;
     }
 
-    setSelectedUsers([user]);
+    setSelectedUsers((current) => {
+      if (current.length >= 1) {
+        setChatType("group");
+        return [...current, user];
+      }
+
+      return [user];
+    });
   };
 
   const removeSelectedUser = (userId: string) => {
