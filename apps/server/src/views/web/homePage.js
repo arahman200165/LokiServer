@@ -33,6 +33,17 @@ const homePageStyles = `
     font-size: 14px;
   }
   tr:last-child td { border-bottom: none; }
+  .health-actions {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .health-hint {
+    font-size: 13px;
+    color: var(--muted);
+  }
   form { margin-top: 20px; }
 `;
 
@@ -46,6 +57,10 @@ export const renderHomePageHtml = ({ username, apiPrefix }) =>
         <p>Authenticated as <strong>${escapeHtml(username)}</strong>.</p>
         <span class="chip">API Prefix: <code>${escapeHtml(apiPrefix)}</code></span>
         ${renderApiTable({ apiPrefix })}
+        <form class="health-actions" method="get" action="/web/health-check" target="_blank" rel="noopener noreferrer">
+          <button type="submit">Run Health Check</button>
+          <span class="health-hint">Opens endpoint response in a new tab.</span>
+        </form>
         <form method="post" action="/logout">
           <button type="submit">Logout</button>
         </form>

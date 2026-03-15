@@ -1,13 +1,11 @@
 import { Router } from 'express';
+import { runHealthCheck } from '../services/healthCheckService.js';
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+router.get('/', async (req, res) => {
+  const result = await runHealthCheck();
+  return res.status(result.statusCode).json(result.payload);
 });
 
 export default router;

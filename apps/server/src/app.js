@@ -15,7 +15,8 @@ import {
   renderLoginPage,
   handleLoginPage,
   renderProtectedHomePage,
-  handleLogoutPage
+  handleLogoutPage,
+  handleWebHealthCheck
 } from './controllers/webAuthController.js';
 
 const app = express();
@@ -30,6 +31,7 @@ app.get('/login', renderLoginPage);
 app.post('/login', handleLoginPage);
 app.get('/', requireBrowserSession, renderProtectedHomePage);
 app.post('/logout', requireBrowserSession, handleLogoutPage);
+app.get('/web/health-check', requireBrowserSession, handleWebHealthCheck);
 
 app.use(`${env.apiPrefix}/auth`, requireApiKey, authRoutes);
 app.use('/api', requireApiKey, requireSessionAuth);
