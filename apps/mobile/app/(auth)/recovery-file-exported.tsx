@@ -1,7 +1,6 @@
 import { Pressable, ScrollView, Text } from "react-native";
 import { router } from "expo-router";
 import { authStyles } from "../../src/auth/ui";
-import { saveAuthFlowPatch } from "../../src/auth/flowStore";
 
 export default function RecoveryFileExportedScreen() {
   return (
@@ -13,10 +12,7 @@ export default function RecoveryFileExportedScreen() {
 
       <Pressable
         style={authStyles.primaryButton}
-        onPress={async () => {
-          await saveAuthFlowPatch({ recoveryFileExported: true });
-          router.push("/(auth)/protect-device");
-        }}
+        onPress={() => router.push("/(auth)/protect-device")}
       >
         <Text style={authStyles.primaryText}>Continue</Text>
       </Pressable>
@@ -30,4 +26,3 @@ export default function RecoveryFileExportedScreen() {
     </ScrollView>
   );
 }
-

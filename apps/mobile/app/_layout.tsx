@@ -1,10 +1,8 @@
+import "../src/polyfills/crypto";
 import { Stack } from "expo-router";
-import { Image, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StyleSheet, View } from "react-native";
 
 export default function RootLayout() {
-  const insets = useSafeAreaInsets();
-
   return (
     <View style={styles.root}>
       <Stack
@@ -27,9 +25,6 @@ export default function RootLayout() {
           }}
         />
       </Stack>
-      <View pointerEvents="none" style={[styles.branding, { top: insets.top + 8 }]}>
-        <Image source={require("../assets/images/icon.png")} style={styles.logo} resizeMode="contain" />
-      </View>
     </View>
   );
 }

@@ -5,6 +5,7 @@ import { authStyles } from "../../src/auth/ui";
 import { apiPost } from "../../src/auth/api";
 import { generateEd25519KeyPair } from "../../src/auth/crypto";
 import { saveAuthFlowPatch } from "../../src/auth/flowStore";
+import { buildDeviceLabel, getAuthPlatform } from "../../src/auth/deviceMetadata";
 
 type StartLinkResponse = {
   link_session_id: string;
@@ -21,11 +22,13 @@ export default function LinkDeviceScreen() {
     const run = async () => {
       try {
         const keys = await generateEd25519KeyPair();
+        const platform = getAuthPlatform();
+        const deviceLabel = buildDeviceLabel();
         const data = await apiPost<StartLinkResponse>("/v1/devices/link/start", {
           new_device_public_identity_key: keys.publicJwk,
           new_device_prekeys: [],
-          platform: "android",
-          device_label: "Pixel 9",
+          platform,
+          device_label: deviceLabel,
         });
 
         await saveAuthFlowPatch({

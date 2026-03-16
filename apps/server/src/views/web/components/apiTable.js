@@ -85,7 +85,7 @@ export const renderApiTable = ({ apiPrefix }) => {
       queryParams: [],
       pathParams: [],
       requestBody: {
-        account_locator: '<account-locator>',
+        account_locator: 'LOKI:DancingPanda123',
         new_device_public_identity_key: { kty: 'OKP', crv: 'Ed25519', x: '<base64url>' },
         new_device_prekeys: {},
         platform: 'android',

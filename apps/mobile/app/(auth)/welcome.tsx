@@ -7,6 +7,7 @@ import { wipeAllLocalAuthData } from "../../src/auth/localWipe";
 
 export default function WelcomeScreen() {
   const [hasDeviceIdentity, setHasDeviceIdentity] = useState(false);
+  const [hasLocalData, setHasLocalData] = useState(false);
   const [isWiping, setIsWiping] = useState(false);
   const { notice } = useLocalSearchParams<{ notice?: string }>();
 
@@ -14,6 +15,19 @@ export default function WelcomeScreen() {
     const run = async () => {
       const state = await loadAuthFlowState();
       setHasDeviceIdentity(Boolean(state.deviceId && state.devicePrivateJwk));
+      const hasAnySavedAuthState = Object.values(state).some((value) => {
+        if (Array.isArray(value)) {
+          return value.length > 0;
+        }
+        if (typeof value === "boolean") {
+          return value;
+        }
+        if (typeof value === "number") {
+          return value !== 0;
+        }
+        return Boolean(value);
+      });
+      setHasLocalData(hasAnySavedAuthState);
     };
     void run();
   }, []);
@@ -33,6 +47,7 @@ export default function WelcomeScreen() {
               try {
                 await wipeAllLocalAuthData();
                 setHasDeviceIdentity(false);
+                setHasLocalData(false);
                 router.replace({
                   pathname: "/(auth)/welcome",
                   params: { notice: "session-reset" },
@@ -95,15 +110,17 @@ export default function WelcomeScreen() {
         <Text style={authStyles.tertiaryText}>Learn how privacy works</Text>
       </Pressable>
 
-      <Pressable
-        style={[authStyles.tertiaryButton, isWiping ? { opacity: 0.7 } : null]}
-        onPress={wipeWithConfirmation}
-        disabled={isWiping}
-      >
-        <Text style={[authStyles.tertiaryText, { color: "#fca5a5" }]}>
-          {isWiping ? "Wiping local data..." : "Wipe local data"}
-        </Text>
-      </Pressable>
+      {hasLocalData ? (
+        <Pressable
+          style={[authStyles.tertiaryButton, isWiping ? { opacity: 0.7 } : null]}
+          onPress={wipeWithConfirmation}
+          disabled={isWiping}
+        >
+          <Text style={[authStyles.tertiaryText, { color: "#fca5a5" }]}>
+            {isWiping ? "Wiping local data..." : "Wipe local data"}
+          </Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }

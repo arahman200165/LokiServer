@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { query } from '../db/pool.js';
+import { getPool, query } from '../db/pool.js';
 
 const CHALLENGE_TTL_MS = 1000 * 60 * 5;
 const LINK_SESSION_TTL_MS = 1000 * 60 * 5;
@@ -13,6 +13,53 @@ const randomBase64 = (size = 24) => crypto.randomBytes(size).toString('base64');
 const randomOpaque = (size = 24) => crypto.randomBytes(size).toString('base64url');
 const randomCode = () => String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
 const utf8ToHex = (value) => Buffer.from(value ?? '', 'utf8').toString('hex');
+const pad3 = (value) => String(value).padStart(3, '0');
+
+const LOCATOR_MAX_GENERATION_ATTEMPTS = 64;
+const LOCATOR_VERBS = [
+  'Dancing', 'Running', 'Flying', 'Singing', 'Laughing', 'Gliding', 'Jumping', 'Racing',
+  'Roaming', 'Sailing', 'Drifting', 'Climbing', 'Wandering', 'Shining', 'Blooming', 'Braving',
+  'Sparking', 'Soaring', 'Hiking', 'Diving', 'Sketching', 'Building', 'Reading', 'Writing'
+];
+const LOCATOR_NOUNS = [
+  'Panda', 'Falcon', 'Tiger', 'Otter', 'Willow', 'River', 'Summit', 'Comet',
+  'Harbor', 'Canyon', 'Forest', 'Voyager', 'Beacon', 'Lantern', 'Phoenix', 'Orchid',
+  'Meadow', 'Nimbus', 'Quartz', 'Rocket', 'Horizon', 'Scholar', 'Anchor', 'Voyage'
+];
+
+const isUniqueViolation = (error) => error?.code === '23505';
+
+const buildLokiIdentifierCandidate = () => {
+  const verb = LOCATOR_VERBS[crypto.randomInt(0, LOCATOR_VERBS.length)];
+  const noun = LOCATOR_NOUNS[crypto.randomInt(0, LOCATOR_NOUNS.length)];
+  const suffix = pad3(crypto.randomInt(0, 1000));
+  return `LOKI:${verb}${noun}${suffix}`;
+};
+
+const identifierExists = async (value, runQuery = query) => {
+  const result = await runQuery(
+    `
+      select
+        exists(select 1 from users where account_locator = $1) as in_users,
+        exists(select 1 from user_contact_codes where contact_code = $1) as in_contact_codes
+    `,
+    [value]
+  );
+  const row = result.rows[0] ?? {};
+  return Boolean(row.in_users || row.in_contact_codes);
+};
+
+const generateUniqueLokiIdentifier = async (runQuery = query) => {
+  for (let attempt = 0; attempt < LOCATOR_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const candidate = buildLokiIdentifierCandidate();
+    const exists = await identifierExists(candidate, runQuery);
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  throw new Error('IDENTIFIER_GENERATION_FAILED');
+};
 
 const parsePublicJwk = (jwkText) => {
   if (typeof jwkText !== 'string' || !jwkText.trim()) {
@@ -194,17 +241,57 @@ export const registerStart = async ({
 
   const userId = uuid();
   const deviceId = uuid();
-  const accountLocator = `acct_${randomOpaque(16)}`;
+  let userInserted = false;
+  let accountLocator = null;
 
-  await query(
-    `
-      insert into users (
-        id, public_identity_key, recovery_public_material, account_locator, account_status
-      )
-      values ($1, $2, $3, $4, 'active')
-    `,
-    [userId, userPublicIdentityKey, recoveryPublicMaterial ?? `rec_${randomOpaque(16)}`, accountLocator]
-  );
+  for (let attempt = 0; attempt < LOCATOR_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const nextLocator = await generateUniqueLokiIdentifier();
+
+    try {
+      if (!userInserted) {
+        await query(
+          `
+            insert into users (
+              id, public_identity_key, recovery_public_material, account_locator, account_status
+            )
+            values ($1, $2, $3, $4, 'active')
+          `,
+          [userId, userPublicIdentityKey, recoveryPublicMaterial ?? `rec_${randomOpaque(16)}`, nextLocator]
+        );
+        userInserted = true;
+      } else {
+        await query(
+          `
+            update users
+            set account_locator = $2, updated_at = now()
+            where id = $1
+          `,
+          [userId, nextLocator]
+        );
+      }
+
+      await query(
+        `
+          insert into user_contact_codes (user_id, contact_code)
+          values ($1, $2)
+          on conflict (user_id) do update set contact_code = excluded.contact_code
+        `,
+        [userId, nextLocator]
+      );
+
+      accountLocator = nextLocator;
+      break;
+    } catch (error) {
+      if (isUniqueViolation(error) && attempt < LOCATOR_MAX_GENERATION_ATTEMPTS - 1) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (!accountLocator) {
+    throw new Error('IDENTIFIER_GENERATION_FAILED');
+  }
 
   await query(
     `
@@ -705,21 +792,73 @@ export const getOrCreateContactCode = async (userId) => {
     return existing.rows[0].contact_code;
   }
 
-  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const chunk = () =>
-    Array.from({ length: 4 }, () => letters[crypto.randomInt(0, letters.length)]).join('');
-  const contactCode = `loki:${chunk()}-${chunk()}-${chunk()}`;
+  const userResult = await query('select account_locator from users where id = $1 limit 1', [userId]);
+  const currentLocator = typeof userResult.rows[0]?.account_locator === 'string'
+    ? userResult.rows[0].account_locator.trim()
+    : '';
 
-  await query(
-    `
-      insert into user_contact_codes (user_id, contact_code)
-      values ($1, $2)
-      on conflict (user_id) do update set contact_code = excluded.contact_code
-    `,
-    [userId, contactCode]
-  );
+  if (currentLocator) {
+    try {
+      await query(
+        `
+          insert into user_contact_codes (user_id, contact_code)
+          values ($1, $2)
+          on conflict (user_id) do update set contact_code = excluded.contact_code
+        `,
+        [userId, currentLocator]
+      );
 
-  return contactCode;
+      return currentLocator;
+    } catch (error) {
+      if (!isUniqueViolation(error)) {
+        throw error;
+      }
+    }
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+  const runQuery = (text, params = []) => client.query(text, params);
+
+  try {
+    for (let attempt = 0; attempt < LOCATOR_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        await runQuery('begin');
+        const generated = await generateUniqueLokiIdentifier(runQuery);
+
+        await runQuery(
+          `
+            update users
+            set account_locator = $2, updated_at = now()
+            where id = $1
+          `,
+          [userId, generated]
+        );
+
+        await runQuery(
+          `
+            insert into user_contact_codes (user_id, contact_code)
+            values ($1, $2)
+            on conflict (user_id) do update set contact_code = excluded.contact_code
+          `,
+          [userId, generated]
+        );
+
+        await runQuery('commit');
+        return generated;
+      } catch (error) {
+        await runQuery('rollback');
+        if (isUniqueViolation(error) && attempt < LOCATOR_MAX_GENERATION_ATTEMPTS - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+  } finally {
+    client.release();
+  }
+
+  throw new Error('IDENTIFIER_GENERATION_FAILED');
 };
 
 const toCoarseLastActive = (timestamp) => {

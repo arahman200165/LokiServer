@@ -16,19 +16,23 @@ export default function DisplayNameScreen() {
       return;
     }
 
-    const state = await loadAuthFlowState();
-    await saveAuthFlowPatch({ displayName: value || null });
-    if (state.authToken) {
-      await apiPut(
-        "/v1/profile",
-        {
-          display_name: value || null,
-          encrypted_profile_blob: null,
-        },
-        state.authToken,
-      );
+    try {
+      const state = await loadAuthFlowState();
+      await saveAuthFlowPatch({ displayName: value || null });
+      if (state.authToken && value) {
+        await apiPut(
+          "/v1/profile",
+          {
+            display_name: value,
+            encrypted_profile_blob: null,
+          },
+          state.authToken,
+        );
+      }
+      router.push("/(auth)/private-id");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Couldn't save your profile name.");
     }
-    router.push("/(auth)/private-id");
   };
 
   return (

@@ -1,18 +1,72 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text } from "react-native";
 import { router } from "expo-router";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { authStyles } from "../../src/auth/ui";
-import { loadAuthFlowState } from "../../src/auth/flowStore";
+import { loadAuthFlowState, saveAuthFlowPatch } from "../../src/auth/flowStore";
+import { buildRecoveryFileV1, stringifyRecoveryFile } from "../../src/auth/recoveryFile";
 
 export default function RecoveryKitScreen() {
   const [canContinue, setCanContinue] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const refreshContinue = async () => {
+    const state = await loadAuthFlowState();
+    setCanContinue(state.recoveryPhraseViewed || state.recoveryFileExported);
+  };
+
+  const exportRecoveryFile = async () => {
+    setIsExporting(true);
+    setExportError(null);
+
+    try {
+      const state = await loadAuthFlowState();
+      if (!state.accountLocator || !state.recoveryPrivateJwk) {
+        throw new Error("Recovery data is missing on this device. Try creating a new recovery kit.");
+      }
+
+      const payload = buildRecoveryFileV1({
+        accountLocator: state.accountLocator,
+        recoveryPrivateJwk: state.recoveryPrivateJwk,
+        recoveryPublicJwk: state.recoveryPublicJwk,
+      });
+
+      if (!FileSystem.cacheDirectory) {
+        throw new Error("File export is unavailable on this device.");
+      }
+
+      const safeLocator = state.accountLocator.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const uri = `${FileSystem.cacheDirectory}loki-recovery-${safeLocator}.json`;
+      await FileSystem.writeAsStringAsync(uri, stringifyRecoveryFile(payload), {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        throw new Error("Sharing is unavailable on this device.");
+      }
+
+      await Sharing.shareAsync(uri, {
+        dialogTitle: "Save encrypted recovery file",
+        mimeType: "application/json",
+        UTI: "public.json",
+      });
+
+      await saveAuthFlowPatch({ recoveryFileExported: true });
+      setCanContinue(true);
+      router.push("/(auth)/recovery-file-exported");
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Couldn't save recovery file.";
+      setExportError(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
-    const run = async () => {
-      const state = await loadAuthFlowState();
-      setCanContinue(state.recoveryPhraseViewed || state.recoveryFileExported);
-    };
-    void run();
+    void refreshContinue();
   }, []);
 
   return (
@@ -35,13 +89,16 @@ export default function RecoveryKitScreen() {
       </Pressable>
 
       <Pressable
-        style={authStyles.card}
-        onPress={() => router.push("/(auth)/recovery-file-exported")}
+        style={[authStyles.card, isExporting ? { opacity: 0.7 } : null]}
+        onPress={() => void exportRecoveryFile()}
+        disabled={isExporting}
       >
         <Text style={authStyles.cardTitle}>Encrypted recovery file</Text>
         <Text style={authStyles.cardText}>A file you can store in a secure location.</Text>
-        <Text style={authStyles.helper}>Save recovery file</Text>
+        <Text style={authStyles.helper}>{isExporting ? "Saving recovery file..." : "Save recovery file"}</Text>
       </Pressable>
+
+      {exportError ? <Text style={authStyles.warning}>{exportError}</Text> : null}
 
       <Text style={authStyles.warning}>
         If you lose your devices and your recovery kit, your account cannot be restored.

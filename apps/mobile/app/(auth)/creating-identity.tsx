@@ -5,7 +5,8 @@ import { authStyles } from "../../src/auth/ui";
 import { apiPost } from "../../src/auth/api";
 import { clearTransientOnboardingState, saveAuthFlowPatch } from "../../src/auth/flowStore";
 import { generateEd25519KeyPair, signUtf8WithPrivateJwk } from "../../src/auth/crypto";
-import { generateRecoveryPhrase } from "../../src/auth/wordlist";
+import { deriveRecoveryKeyPairFromPhrase, generateRecoveryPhrase } from "../../src/auth/recoveryPhrase";
+import { buildDeviceLabel, getAuthPlatform } from "../../src/auth/deviceMetadata";
 
 type RegisterStartResponse = {
   user_id: string;
@@ -42,8 +43,10 @@ export default function CreatingIdentityScreen() {
 
       setProgressIndex(1);
       const deviceKeys = await generateEd25519KeyPair();
-      const recoveryKeys = await generateEd25519KeyPair();
       const phrase = generateRecoveryPhrase();
+      const recoveryKeys = deriveRecoveryKeyPairFromPhrase(phrase);
+      const platform = getAuthPlatform();
+      const deviceLabel = buildDeviceLabel(1);
 
       setProgressIndex(2);
       const start = await apiPost<RegisterStartResponse>("/v1/auth/register/start", {
@@ -51,8 +54,8 @@ export default function CreatingIdentityScreen() {
         device_public_identity_key: deviceKeys.publicJwk,
         recovery_public_material: recoveryKeys.publicJwk,
         device_prekeys: [],
-        platform: "mobile",
-        device_label: "iPhone",
+        platform,
+        device_label: deviceLabel,
       });
 
       const challengeSignature = await signUtf8WithPrivateJwk(

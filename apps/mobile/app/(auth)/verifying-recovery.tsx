@@ -8,6 +8,7 @@ import {
   saveAuthFlowPatch,
 } from "../../src/auth/flowStore";
 import { generateEd25519KeyPair } from "../../src/auth/crypto";
+import { buildDeviceLabel, getAuthPlatform } from "../../src/auth/deviceMetadata";
 
 type RecoveryStartResponse = {
   recovery_session_id: string;
@@ -21,17 +22,19 @@ export default function VerifyingRecoveryScreen() {
     setError(null);
     try {
       const state = await loadAuthFlowState();
-      if (!state.accountLocator) {
-        throw new Error("That recovery kit could not be verified.");
+      if (!state.accountLocator || !state.recoveryPrivateJwk) {
+        throw new Error("Enter your account ID (LOKI:...) and recovery phrase or recovery file.");
       }
 
       const newDeviceKeys = await generateEd25519KeyPair();
+      const platform = getAuthPlatform();
+      const deviceLabel = buildDeviceLabel();
       const response = await apiPost<RecoveryStartResponse>("/v1/auth/recovery/start", {
         account_locator: state.accountLocator,
         new_device_public_identity_key: newDeviceKeys.publicJwk,
         new_device_prekeys: [],
-        platform: "mobile",
-        device_label: "Recovered mobile",
+        platform,
+        device_label: deviceLabel,
       });
 
       await saveAuthFlowPatch({
@@ -44,7 +47,11 @@ export default function VerifyingRecoveryScreen() {
       router.replace("/(auth)/confirm-restore");
     } catch (caught) {
       if (caught instanceof Error && caught.message) {
-        setError(caught.message);
+        if (caught.message.includes("ACCOUNT_NOT_FOUND")) {
+          setError("Account ID not found. Check it and try again.");
+        } else {
+          setError(caught.message);
+        }
       } else {
         setError("That recovery kit could not be verified.");
       }
